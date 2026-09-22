@@ -8,6 +8,16 @@ import { getDocPageBySlug, ALL_DOC_PAGES } from './data/pages';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { useDocJsonLd } from './hooks/useDocJsonLd';
 import { ThemeTransitionOverlay } from './components/common/ThemeTransitionOverlay';
+import { LandingPage } from './pages/LandingPage';
+
+/** Determine initial view based on URL */
+function getInitialView(): 'landing' | 'docs' {
+  // Show landing only when at root with no hash
+  if (window.location.pathname === '/' && !window.location.hash) {
+    return 'landing';
+  }
+  return 'docs';
+}
 
 function AppContent() {
   const [currentSlug, setCurrentSlug] = useState<string>(() => {
@@ -16,7 +26,7 @@ function AppContent() {
     if (hash && getDocPageBySlug(hash)) {
       return hash;
     }
-    // 2. Query param (?page=... or ?p=...)
+    // 2. Query param (?page=... or ?p=...))
     try {
       const searchParams = new URLSearchParams(window.location.search);
       const queryParam = searchParams.get('page') || searchParams.get('p') || searchParams.get('slug');
@@ -140,10 +150,36 @@ function AppContent() {
   );
 }
 
+/** Root app with route detection and ThemeProvider */
+function RootApp() {
+  const [view, setView] = useState<'landing' | 'docs'>(getInitialView);
+
+  // Listen for popstate (back/forward) and hash changes to update view
+  useEffect(() => {
+    const handleNavigation = () => {
+      setView(getInitialView());
+    };
+
+    window.addEventListener('popstate', handleNavigation);
+    window.addEventListener('hashchange', handleNavigation);
+
+    return () => {
+      window.removeEventListener('popstate', handleNavigation);
+      window.removeEventListener('hashchange', handleNavigation);
+    };
+  }, []);
+
+  if (view === 'landing') {
+    return <LandingPage />;
+  }
+
+  return <AppContent />;
+}
+
 export default function App() {
   return (
     <ThemeProvider>
-      <AppContent />
+      <RootApp />
     </ThemeProvider>
   );
 }
