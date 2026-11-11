@@ -28,6 +28,7 @@ import {
   Brain,
   Ruler,
   Server,
+  Maximize2,
 } from 'lucide-react';
 import { KernelScene } from './KernelScene';
 import {
@@ -273,6 +274,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ isDark, onToggleTheme,
     { href: '#features', label: 'Features' },
     { href: '#agents', label: 'Agents' },
     { href: '#how', label: 'How it works' },
+    { href: '#architecture', label: 'Architecture' },
     { href: '#security', label: 'Security' },
     { href: '#download', label: 'Download' },
   ];
@@ -311,13 +313,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({ isDark, onToggleTheme,
               <img src="/logo.png" alt="" width={28} height={28} className="object-contain" />
               <span className="font-bold tracking-tight">Kernel Base</span>
             </a>
-            <div className="hidden lg:flex items-center gap-1">
+            <div className="hidden xl:flex items-center gap-1">
               {navLinks.map((l) => (
                 <a
                   key={l.href}
                   href={l.href}
                   onClick={(e) => scrollTo(e, l.href)}
-                  className="px-3 py-1.5 rounded-lg text-sm transition-colors hover:opacity-100 opacity-80"
+                  className="px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition-colors hover:opacity-100 opacity-80"
                   style={{ color: 'var(--kb-text-muted)' }}
                 >
                   {l.label}
@@ -648,6 +650,41 @@ export const LandingPage: React.FC<LandingPageProps> = ({ isDark, onToggleTheme,
                 ))}
               </motion.ol>
             </div>
+          </div>
+        </section>
+
+        {/* ── Architecture diagram (generated with Archify) ─────────────── */}
+        <section id="architecture" className="px-4 sm:px-6 py-24 sm:py-32 scroll-mt-20">
+          <div className="mx-auto max-w-7xl">
+            <SectionHeading
+              eyebrow="Architecture"
+              title="How the desktop app is wired."
+              lead="The React renderer reaches Node only through the preload bridge. Main-process IPC handlers run the agent runtime, whose tool calls pass the permission broker before touching your workspace. Hover, trace routes or zoom in the live diagram."
+            />
+            <Reveal>
+              <div className="rounded-2xl border overflow-hidden" style={glass}>
+                <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b text-xs" style={{ borderColor: 'var(--kb-border)', color: 'var(--kb-text-faint)' }}>
+                  <span className="font-mono truncate">kernel-base-ide.architecture</span>
+                  <a
+                    href={`/diagrams/kernel-base-ide.html?theme=${isDark ? 'dark' : 'light'}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 font-medium shrink-0"
+                    style={{ color: 'var(--kb-accent-bright)' }}
+                  >
+                    <Maximize2 className="h-3.5 w-3.5" /> Open full screen
+                  </a>
+                </div>
+                <iframe
+                  key={isDark ? 'dark' : 'light'}
+                  src={`/diagrams/kernel-base-ide.html?theme=${isDark ? 'dark' : 'light'}`}
+                  title="Kernel Base IDE desktop architecture diagram"
+                  loading="lazy"
+                  className="block w-full h-[520px] sm:h-[680px] lg:h-[760px]"
+                  style={{ border: 0, backgroundColor: 'var(--kb-code-bg)' }}
+                />
+              </div>
+            </Reveal>
           </div>
         </section>
 

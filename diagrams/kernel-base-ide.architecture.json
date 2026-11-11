@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Kernel Base IDE — Desktop Architecture",
+    "output": "public/diagrams/kernel-base-ide.html",
+    "quality_profile": "showcase",
+    "locale": "en"
+  },
+  "components": [
+    { "id": "dev", "type": "external", "label": "Developer", "sublabel": "keys · voice", "pos": [40, 200], "size": [120, 64] },
+    { "id": "renderer", "type": "frontend", "label": "Renderer UI", "sublabel": "React 19 · Monaco · xterm.js", "pos": [230, 190], "size": [170, 84], "tag": "diff reviewer" },
+    { "id": "bridge", "type": "security", "label": "Preload bridge", "sublabel": "window.kernelBase", "pos": [470, 200], "size": [150, 64] },
+    { "id": "ipc", "type": "backend", "label": "IPC handlers", "sublabel": "Electron main · Node", "pos": [690, 200], "size": [160, 64] },
+    { "id": "agents", "type": "backend", "label": "Agent runtime", "sublabel": "7 roles · task plan", "pos": [990, 200], "size": [170, 64], "tag": "ask/plan/build" },
+    { "id": "studio", "type": "backend", "label": "Agent Studio", "sublabel": "parallel CLI agents", "pos": [690, 40], "size": [160, 64] },
+    { "id": "clis", "type": "external", "label": "AI CLIs", "sublabel": "agy · gemini", "pos": [990, 40], "size": [170, 64] },
+    { "id": "keychain", "type": "database", "label": "macOS Keychain", "sublabel": "API key secrets", "pos": [690, 380], "size": [160, 64] },
+    { "id": "tools", "type": "backend", "label": "Tool engine", "sublabel": "read · write · exec", "pos": [990, 380], "size": [170, 64] },
+    { "id": "perm", "type": "security", "label": "Permission broker", "sublabel": "rm -rf · sudo gated", "pos": [990, 540], "size": [170, 64] },
+    { "id": "workspace", "type": "database", "label": "Workspace", "sublabel": "files · git · node-pty", "pos": [990, 700], "size": [170, 64] }
+  ],
+  "connections": [
+    { "id": "dev-renderer", "from": "dev", "to": "renderer", "label": "prompts", "variant": "emphasis" },
+    { "id": "renderer-bridge", "from": "renderer", "to": "bridge", "label": "invoke", "variant": "emphasis" },
+    { "id": "bridge-ipc", "from": "bridge", "to": "ipc", "label": "IPC", "variant": "emphasis" },
+    { "id": "ipc-agents", "from": "ipc", "to": "agents", "label": "agents:startTask", "variant": "emphasis" },
+    { "id": "agents-tools", "from": "agents", "to": "tools", "label": "tool calls" },
+    { "id": "tools-perm", "from": "tools", "to": "perm", "label": "risk check", "variant": "security" },
+    { "id": "perm-workspace", "from": "perm", "to": "workspace", "label": "if approved", "variant": "security" },
+    { "id": "perm-renderer", "from": "perm", "to": "renderer", "label": "approval prompt", "variant": "security", "fromSide": "left", "toSide": "bottom" },
+    { "id": "ipc-keychain", "from": "ipc", "to": "keychain", "label": "secrets" },
+    { "id": "ipc-studio", "from": "ipc", "to": "studio", "label": "studio:spawn" },
+    { "id": "studio-clis", "from": "studio", "to": "clis", "label": "child process", "variant": "dashed" }
+  ],
+  "cards": [
+    { "dot": "amber", "title": "Agent swarm", "items": ["Orchestrator, Planner, Coder, Tester, Reviewer, Researcher, Debugger", "Modes: ask, plan, build, review, debug", "Progress streams back to the UI as agents:event"] },
+    { "dot": "cyan", "title": "Models", "items": ["Agent Studio spawns your signed-in agy / gemini CLIs", "Provider configs: Anthropic, OpenAI, Ollama on localhost:11434", "Kernel voice: on-device kb-listen speech into a warm agy session"] },
+    { "dot": "rose", "title": "Security", "items": ["Renderer only reaches Node through window.kernelBase", "Writes need approval; rm -rf / sudo raise a danger prompt", "Keys stored in the macOS Keychain, never in config files"] },
+    { "dot": "emerald", "title": "Desktop", "items": ["Real PTY shell via node-pty (pipe fallback)", "Git via the git CLI: stage, diff, commit, push", "macOS arm64 and Linux x64 / arm64 builds"] }
+  ]
+}
