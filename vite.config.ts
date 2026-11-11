@@ -29,7 +29,7 @@ function stripInstallersPlugin(): Plugin {
       const dir = path.resolve(__dirname, 'dist/downloads');
       if (!fs.existsSync(dir)) return;
       for (const f of fs.readdirSync(dir)) {
-        if (/\.(dmg|tar\.gz)$/.test(f)) fs.rmSync(path.join(dir, f));
+        if (/\.(dmg|tar\.gz|exe)$/.test(f)) fs.rmSync(path.join(dir, f));
       }
     },
   };

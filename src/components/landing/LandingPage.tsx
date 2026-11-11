@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, useScroll, useTransform, type Variants } from 'motion/react';
 import {
   Apple,
@@ -29,13 +29,19 @@ import {
   Ruler,
   Server,
   Maximize2,
+  Share2,
+  Smartphone,
 } from 'lucide-react';
 import { KernelScene } from './KernelScene';
 import {
   CHECKSUMS_URL,
   IDE_VERSION,
   INSTALLERS,
+  OS_FAMILIES,
   detectPlatform,
+  refinePlatform,
+  type OsFamily,
+  type PlatformId,
   downloadUrl,
   formatSize,
   type InstallerBuild,
@@ -174,90 +180,226 @@ const CopyButton: React.FC<{ value: string; label?: string }> = ({ value, label 
   );
 };
 
-const PlatformIcon: React.FC<{ os: InstallerBuild['os']; className?: string }> = ({ os, className }) =>
-  os === 'macOS' ? <Apple className={className} /> : <Monitor className={className} />;
+const WindowsIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden>
+    <path d="M3 5.1 10.4 4v7.2H3V5.1Zm0 13.8 7.4 1.1v-7.1H3v6Zm8.3 1.2L21 21.5V12.9h-9.7v7.2Zm0-16.2v7.3H21V2.5l-9.7 1.4Z" />
+  </svg>
+);
 
-const DownloadCard: React.FC<{ build: InstallerBuild; primary: boolean }> = ({ build, primary }) => (
-  <motion.div
-    variants={fadeUp}
-    className="relative rounded-2xl border p-6 flex flex-col h-full"
-    style={{
-      ...glass,
-      borderColor: primary ? 'var(--kb-accent)' : 'var(--kb-border)',
-      boxShadow: primary ? '0 0 0 1px var(--kb-accent), 0 24px 60px -24px rgba(232,101,38,0.55)' : undefined,
-    }}
-  >
-    {primary && (
-      <span
-        className="absolute -top-3 left-6 rounded-full px-3 py-0.5 text-[11px] font-semibold text-white"
-        style={{ background: 'linear-gradient(90deg, var(--kb-brand-secondary), var(--kb-accent-bright))' }}
+const PlatformIcon: React.FC<{ os: OsFamily; className?: string }> = ({ os, className }) =>
+  os === 'Windows' ? <WindowsIcon className={className} /> : os === 'macOS' ? <Apple className={className} /> : <Terminal className={className} />;
+
+const gradientBtn: React.CSSProperties = { background: 'linear-gradient(135deg, var(--kb-brand-secondary), var(--kb-accent-bright))' };
+
+/** Phone / tablet visitors: the IDE is desktop-only, so offer to send the link to a computer. */
+const MobileNotice: React.FC = () => {
+  const [copied, setCopied] = useState(false);
+  const share = async () => {
+    const url = `${window.location.origin}/#download`;
+    const nav = navigator as Navigator & { share?: (d: ShareData) => Promise<void> };
+    try {
+      if (nav.share) {
+        await nav.share({ title: 'Kernel Base IDE', text: 'Download Kernel Base on your computer', url });
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      /* share sheet dismissed or clipboard blocked */
+    }
+  };
+  return (
+    <div className="mb-5 rounded-2xl border p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-3" style={{ ...glass, borderColor: 'var(--kb-border-hover)' }}>
+      <div className="flex items-start gap-3 flex-1 min-w-0">
+        <Smartphone className="h-5 w-5 shrink-0 mt-0.5" style={{ color: 'var(--kb-accent-bright)' }} />
+        <p className="text-sm leading-relaxed" style={{ color: 'var(--kb-text-muted)' }}>
+          You are on a phone or tablet. Kernel Base is a desktop app for Windows, macOS and Linux. Send this page to your
+          computer, or download the installer here and move it over.
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={share}
+        className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 min-h-[44px] text-sm font-semibold text-white shrink-0"
+        style={gradientBtn}
       >
-        Recommended for you
-      </span>
-    )}
-    <div className="flex items-center gap-3 mb-4">
-      <div className="h-11 w-11 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'var(--kb-surface-secondary)' }}>
-        <PlatformIcon os={build.os} className="h-5 w-5" />
-      </div>
-      <div>
-        <h3 className="font-semibold text-lg leading-tight">{build.os}</h3>
-        <p className="text-sm" style={{ color: 'var(--kb-text-subtle)' }}>{build.arch}</p>
-      </div>
+        {copied ? <Check className="h-4 w-4" /> : <Share2 className="h-4 w-4" />}
+        {copied ? 'Link copied' : 'Send to my computer'}
+      </button>
     </div>
+  );
+};
 
-    <p className="text-sm mb-5" style={{ color: 'var(--kb-text-muted)' }}>{build.requirements}</p>
+const InstallSteps: React.FC<{ build: InstallerBuild }> = ({ build }) => (
+  <ol className="space-y-3 text-sm">
+    {build.installSteps.map((s, i) => (
+      <li key={i} className="flex gap-3">
+        <span
+          className="h-5 w-5 shrink-0 rounded-full text-[11px] font-semibold flex items-center justify-center mt-0.5"
+          style={{ backgroundColor: 'var(--kb-surface-secondary)', color: 'var(--kb-accent-bright)' }}
+        >
+          {i + 1}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p style={{ color: 'var(--kb-text-muted)' }}>{s.text}</p>
+          {s.code && (
+            <div className="mt-2 flex items-center gap-2 rounded-lg px-3 py-2" style={{ backgroundColor: 'var(--kb-code-bg)', color: 'var(--kb-code-text)' }}>
+              <code className="text-[12px] flex-1 min-w-0 whitespace-pre-wrap break-all">{s.code}</code>
+              <CopyButton value={s.code} />
+            </div>
+          )}
+        </div>
+      </li>
+    ))}
+  </ol>
+);
 
-    <a
-      href={downloadUrl(build)}
-      download={build.fileName}
-      className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 font-semibold text-white transition-transform hover:-translate-y-0.5 active:translate-y-0"
-      style={{ background: 'linear-gradient(135deg, var(--kb-brand-secondary), var(--kb-accent-bright))' }}
-    >
-      <Download className="h-4 w-4" />
-      {build.format} · {formatSize(build.sizeBytes)}
-    </a>
+/** Tabbed OS / architecture picker with a single detail card. Stacks cleanly down to 320px. */
+const DownloadPanel: React.FC<{ recommended: PlatformId; showBadge: boolean }> = ({ recommended, showBadge }) => {
+  const [selectedId, setSelectedId] = useState<PlatformId>(recommended);
+  useEffect(() => setSelectedId(recommended), [recommended]);
+  const build = INSTALLERS.find((b) => b.id === selectedId) ?? INSTALLERS[0];
+  const osBuilds = INSTALLERS.filter((b) => b.os === build.os);
 
-    <ol className="mt-6 space-y-3 text-sm flex-1">
-      {build.installSteps.map((s, i) => (
-        <li key={i} className="flex gap-3">
-          <span
-            className="h-5 w-5 shrink-0 rounded-full text-[11px] font-semibold flex items-center justify-center mt-0.5"
-            style={{ backgroundColor: 'var(--kb-surface-secondary)', color: 'var(--kb-accent-bright)' }}
-          >
-            {i + 1}
-          </span>
-          <div className="min-w-0 flex-1">
-            <p style={{ color: 'var(--kb-text-muted)' }}>{s.text}</p>
-            {s.code && (
-              <div
-                className="mt-2 flex items-center gap-2 rounded-lg px-3 py-2"
-                style={{ backgroundColor: 'var(--kb-code-bg)', color: 'var(--kb-code-text)' }}
-              >
-                <code className="text-[12px] flex-1 min-w-0 overflow-x-auto whitespace-nowrap">{s.code}</code>
-                <CopyButton value={s.code} />
+  return (
+    <div className="rounded-2xl border overflow-hidden" style={glass}>
+      {/* OS tabs */}
+      <div role="tablist" aria-label="Operating system" className="grid grid-cols-3 border-b" style={{ borderColor: 'var(--kb-border)' }}>
+        {OS_FAMILIES.map((os) => {
+          const active = build.os === os;
+          const target = INSTALLERS.find((b) => b.os === os && b.id === recommended) ?? INSTALLERS.find((b) => b.os === os)!;
+          return (
+            <button
+              key={os}
+              role="tab"
+              aria-selected={active}
+              type="button"
+              onClick={() => setSelectedId(target.id)}
+              className="relative flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 px-2 py-3.5 sm:py-4 min-h-[56px] text-sm font-semibold transition-colors"
+              style={{
+                color: active ? 'var(--kb-text)' : 'var(--kb-text-subtle)',
+                backgroundColor: active ? 'color-mix(in srgb, var(--kb-accent) 10%, transparent)' : 'transparent',
+              }}
+            >
+              <PlatformIcon os={os} className="h-5 w-5" />
+              <span>{os}</span>
+              {active && <span aria-hidden className="absolute inset-x-0 bottom-0 h-[2px]" style={gradientBtn} />}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="p-5 sm:p-8 grid md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-8">
+        {/* Left: choose build + download */}
+        <div className="min-w-0">
+          {osBuilds.length > 1 && (
+            <div className="mb-5">
+              <p className="text-[11px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--kb-text-faint)' }}>Architecture</p>
+              <div className="grid grid-cols-2 gap-2">
+                {osBuilds.map((b) => {
+                  const active = b.id === build.id;
+                  return (
+                    <button
+                      key={b.id}
+                      type="button"
+                      onClick={() => setSelectedId(b.id)}
+                      aria-pressed={active}
+                      className="rounded-xl border px-3 py-2.5 min-h-[44px] text-left text-sm transition-colors"
+                      style={{
+                        borderColor: active ? 'var(--kb-accent)' : 'var(--kb-border)',
+                        backgroundColor: active ? 'color-mix(in srgb, var(--kb-accent) 12%, transparent)' : 'transparent',
+                      }}
+                    >
+                      <span className="block font-semibold">{b.shortName.replace(`${b.os} `, '')}</span>
+                      <span className="block text-xs truncate" style={{ color: 'var(--kb-text-subtle)' }}>{b.arch}</span>
+                    </button>
+                  );
+                })}
               </div>
+            </div>
+          )}
+
+          <div className="flex items-center gap-3 mb-2">
+            <h3 className="font-semibold text-xl">{build.os}</h3>
+            {showBadge && build.id === recommended && (
+              <span className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold text-white" style={gradientBtn}>Recommended for you</span>
             )}
           </div>
+          <p className="text-sm mb-5" style={{ color: 'var(--kb-text-muted)' }}>{build.arch} · {build.requirements}</p>
+
+          <a
+            href={downloadUrl(build)}
+            download={build.fileName}
+            className="flex w-full items-center justify-center gap-2.5 rounded-xl px-5 py-4 min-h-[52px] font-semibold text-white transition-transform hover:-translate-y-0.5 active:translate-y-0"
+            style={{ ...gradientBtn, boxShadow: '0 18px 40px -18px rgba(232,101,38,0.7)' }}
+          >
+            <Download className="h-5 w-5 shrink-0" />
+            <span>Download {build.format}</span>
+            <span className="text-white/75 text-sm font-normal">{formatSize(build.sizeBytes)}</span>
+          </a>
+          <p className="mt-2 text-xs break-all" style={{ color: 'var(--kb-text-faint)' }}>{build.fileName}</p>
+
+          <div className="mt-6 pt-4 border-t" style={{ borderColor: 'var(--kb-border)' }}>
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--kb-text-faint)' }}>SHA-256</span>
+              <CopyButton value={build.sha256} />
+            </div>
+            <code className="block text-[11px] break-all leading-relaxed" style={{ color: 'var(--kb-text-subtle)' }}>{build.sha256}</code>
+          </div>
+        </div>
+
+        {/* Right: install steps */}
+        <div className="min-w-0 md:border-l md:pl-8" style={{ borderColor: 'var(--kb-border)' }}>
+          <p className="text-[11px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--kb-text-faint)' }}>Install</p>
+          <InstallSteps build={build} />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/** Compact list of every installer, for visitors who want a specific file. */
+const AllDownloads: React.FC = () => (
+  <div className="rounded-2xl border overflow-hidden" style={glass}>
+    <p className="px-4 sm:px-5 py-3 border-b text-[11px] font-semibold uppercase tracking-wider" style={{ borderColor: 'var(--kb-border)', color: 'var(--kb-text-faint)' }}>
+      All installers
+    </p>
+    <ul>
+      {INSTALLERS.map((b, i) => (
+        <li key={b.id} className={`flex items-center gap-3 px-4 sm:px-5 py-3 ${i ? 'border-t' : ''}`} style={{ borderColor: 'var(--kb-border)' }}>
+          <PlatformIcon os={b.os} className="h-4 w-4 shrink-0" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium truncate">{b.shortName}</p>
+            <p className="text-xs truncate" style={{ color: 'var(--kb-text-faint)' }}>{b.format} · {formatSize(b.sizeBytes)}</p>
+          </div>
+          <a
+            href={downloadUrl(b)}
+            download={b.fileName}
+            className="inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 min-h-[40px] text-sm font-medium shrink-0"
+            style={{ borderColor: 'var(--kb-border-hover)', color: 'var(--kb-accent-bright)' }}
+            aria-label={`Download ${b.shortName} (${b.fileName})`}
+          >
+            <Download className="h-4 w-4" /> <span className="hidden xs:inline sm:inline">Download</span>
+          </a>
         </li>
       ))}
-    </ol>
-
-    <div className="mt-6 pt-4 border-t" style={{ borderColor: 'var(--kb-border)' }}>
-      <div className="flex items-center justify-between gap-2 mb-1">
-        <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--kb-text-faint)' }}>SHA-256</span>
-        <CopyButton value={build.sha256} />
-      </div>
-      <code className="block text-[11px] break-all leading-relaxed" style={{ color: 'var(--kb-text-subtle)' }}>
-        {build.sha256}
-      </code>
-    </div>
-  </motion.div>
+    </ul>
+  </div>
 );
 
 // ── Page ───────────────────────────────────────────────────────────────────
 export const LandingPage: React.FC<LandingPageProps> = ({ isDark, onToggleTheme, onOpenDocs }) => {
-  const platform = useMemo(detectPlatform, []);
-  const primary = INSTALLERS.find((b) => b.id === platform) ?? INSTALLERS[0];
+  const initialPlatform = useMemo(detectPlatform, []);
+  const [platform, setPlatform] = useState(initialPlatform);
+  useEffect(() => {
+    let alive = true;
+    refinePlatform(initialPlatform).then((p) => alive && setPlatform(p));
+    return () => {
+      alive = false;
+    };
+  }, [initialPlatform]);
+  const primary = INSTALLERS.find((b) => b.id === platform.id) ?? INSTALLERS[0];
 
   const heroRef = useRef<HTMLElement>(null);
   const { scrollYProgress: heroProgress } = useScroll({ target: heroRef, offset: ['start start', 'end start'] });
@@ -380,7 +522,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ isDark, onToggleTheme,
                 style={glass}
               >
                 <span className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ backgroundColor: 'var(--kb-accent-bright)' }} />
-                v{IDE_VERSION} preview · macOS & Linux builds available
+                v{IDE_VERSION} preview · Windows, macOS & Linux
                 <ArrowRight className="h-3 w-3" />
               </motion.a>
 
@@ -402,19 +544,27 @@ export const LandingPage: React.FC<LandingPageProps> = ({ isDark, onToggleTheme,
               </motion.p>
 
               <motion.div variants={fadeUp} className="mt-9 flex flex-col sm:flex-row gap-3">
-                <a
-                  href={downloadUrl(primary)}
-                  download={primary.fileName}
-                  className="group inline-flex items-center justify-center gap-2.5 rounded-xl px-6 py-3.5 font-semibold text-white shadow-lg transition-transform hover:-translate-y-0.5"
-                  style={{
-                    background: 'linear-gradient(135deg, var(--kb-brand-secondary), var(--kb-accent-bright))',
-                    boxShadow: '0 18px 40px -16px rgba(232,101,38,0.7)',
-                  }}
-                >
-                  <PlatformIcon os={primary.os} className="h-5 w-5" />
-                  {primary.label}
-                  <span className="text-white/75 text-sm font-normal">{formatSize(primary.sizeBytes)}</span>
-                </a>
+                {platform.isMobile ? (
+                  <a
+                    href="#download"
+                    onClick={(e) => scrollTo(e, '#download')}
+                    className="inline-flex items-center justify-center gap-2.5 rounded-xl px-6 py-3.5 min-h-[52px] font-semibold text-white shadow-lg"
+                    style={{ ...gradientBtn, boxShadow: '0 18px 40px -16px rgba(232,101,38,0.7)' }}
+                  >
+                    <Download className="h-5 w-5" /> Get it for desktop
+                  </a>
+                ) : (
+                  <a
+                    href={downloadUrl(primary)}
+                    download={primary.fileName}
+                    className="group inline-flex items-center justify-center gap-2.5 rounded-xl px-6 py-3.5 min-h-[52px] font-semibold text-white shadow-lg transition-transform hover:-translate-y-0.5"
+                    style={{ ...gradientBtn, boxShadow: '0 18px 40px -16px rgba(232,101,38,0.7)' }}
+                  >
+                    <PlatformIcon os={primary.os} className="h-5 w-5" />
+                    {primary.label}
+                    <span className="text-white/75 text-sm font-normal">{formatSize(primary.sizeBytes)}</span>
+                  </a>
+                )}
                 <button
                   type="button"
                   onClick={() => onOpenDocs()}
@@ -426,16 +576,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ isDark, onToggleTheme,
               </motion.div>
 
               <motion.p variants={fadeUp} className="mt-4 text-sm" style={{ color: 'var(--kb-text-faint)' }}>
-                Also on{' '}
-                {INSTALLERS.filter((b) => b.id !== primary.id).map((b, i, arr) => (
-                  <React.Fragment key={b.id}>
-                    <a href={downloadUrl(b)} download={b.fileName} className="underline underline-offset-4 hover:opacity-80" style={{ color: 'var(--kb-text-subtle)' }}>
-                      {b.shortName}
-                    </a>
-                    {i < arr.length - 1 ? ' and ' : ''}
-                  </React.Fragment>
-                ))}
-                {' '}· Apache 2.0
+                Windows x64 / ARM64 · macOS Apple Silicon · Linux x64 / ARM64 ·{' '}
+                <a href="#download" onClick={(e) => scrollTo(e, '#download')} className="underline underline-offset-4 hover:opacity-80" style={{ color: 'var(--kb-text-subtle)' }}>
+                  all downloads
+                </a>
               </motion.p>
             </motion.div>
           </motion.div>
@@ -453,7 +597,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ isDark, onToggleTheme,
           >
             {[
               ['7', 'specialised agents'],
-              ['3', 'native builds: macOS arm64, Linux x64 & arm64'],
+              ['5', 'native builds for Windows, macOS & Linux'],
               ['Cloud + local', 'Gemini, Claude, OpenAI or Ollama'],
               ['100%', 'of agent edits gated by your approval'],
             ].map(([n, l], i) => (
@@ -762,19 +906,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({ isDark, onToggleTheme,
             <SectionHeading
               eyebrow={`Download · v${IDE_VERSION} preview`}
               title="Install Kernel Base."
-              lead="Native builds for Apple Silicon Macs and 64-bit Linux. Verify each file against its SHA-256 checksum before installing."
+              lead="Native builds for Windows (x64 and ARM64), Apple Silicon Macs and 64-bit Linux. Your system is picked automatically; switch tabs for any other platform. Verify each file against its SHA-256 checksum."
             />
-            <motion.div
-              initial="hidden"
-              whileInView="show"
-              viewport={{ once: true, amount: 0.1 }}
-              variants={stagger}
-              className="grid md:grid-cols-3 gap-5 pt-3"
-            >
-              {INSTALLERS.map((b) => (
-                <DownloadCard key={b.id} build={b} primary={b.id === primary.id} />
-              ))}
-            </motion.div>
+            {platform.isMobile && <MobileNotice />}
+            <Reveal className="grid xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-5 items-start">
+              <DownloadPanel recommended={platform.id} showBadge={!platform.isMobile} />
+              <AllDownloads />
+            </Reveal>
             <Reveal className="mt-8 flex flex-col sm:flex-row sm:items-center gap-3 text-sm" delay={0.1}>
               <div className="flex items-center gap-2 rounded-lg px-3 py-2 flex-1 min-w-0" style={{ backgroundColor: 'var(--kb-code-bg)', color: 'var(--kb-code-text)' }}>
                 <code className="text-[12px] flex-1 min-w-0 overflow-x-auto whitespace-nowrap">shasum -a 256 -c SHA256SUMS.txt</code>

@@ -1,7 +1,7 @@
 /**
  * Kernel Base IDE desktop installers.
  *
- * Binaries are ~110–115 MB each, above GitHub's 100 MB per-file limit, so they
+ * Binaries are ~80–115 MB each (most above GitHub's 100 MB per-file limit), so they
  * are NOT committed. They are published as assets on the GitHub Release below.
  * - Dev server: served from `public/downloads/` (gitignored local copies).
  * - Production: served from the GitHub Release.
@@ -17,11 +17,12 @@ export const DOWNLOAD_BASE_URL = RAW_BASE.endsWith('/') ? RAW_BASE : `${RAW_BASE
 
 export const IDE_VERSION = '1.0.0';
 
-export type PlatformId = 'mac-arm64' | 'linux-x64' | 'linux-arm64';
+export type PlatformId = 'win-x64' | 'win-arm64' | 'mac-arm64' | 'linux-x64' | 'linux-arm64';
+export type OsFamily = 'Windows' | 'macOS' | 'Linux';
 
 export interface InstallerBuild {
   id: PlatformId;
-  os: 'macOS' | 'Linux';
+  os: OsFamily;
   arch: string;
   label: string;
   shortName: string;
@@ -34,6 +35,40 @@ export interface InstallerBuild {
 }
 
 export const INSTALLERS: InstallerBuild[] = [
+  {
+    id: 'win-x64',
+    os: 'Windows',
+    arch: 'x64 (Intel / AMD)',
+    label: 'Download for Windows',
+    shortName: 'Windows x64',
+    fileName: 'Kernel-Base-IDE-win-x64-Setup.exe',
+    format: '.exe',
+    sizeBytes: 91323061,
+    sha256: '2af5692ff9a2cae010892fb86bfeef89bae9a3844b39cf07f75c38ca58caeae0',
+    requirements: 'Windows 10 / 11 · 64-bit · no admin rights needed',
+    installSteps: [
+      { text: 'Run Kernel-Base-IDE-win-x64-Setup.exe. It installs per-user to:', code: '%LOCALAPPDATA%\\Programs\\Kernel Base' },
+      { text: 'The preview installer is unsigned. If SmartScreen appears, choose More info, then Run anyway.' },
+      { text: 'Launch Kernel Base from the Start menu.' },
+    ],
+  },
+  {
+    id: 'win-arm64',
+    os: 'Windows',
+    arch: 'ARM64 (Snapdragon)',
+    label: 'Download for Windows ARM64',
+    shortName: 'Windows ARM64',
+    fileName: 'Kernel-Base-IDE-win-arm64-Setup.exe',
+    format: '.exe',
+    sizeBytes: 86343406,
+    sha256: 'deae9ee32e6377cd682cdf14f1b62acbffdfdd4fe89d1bac65e403c7dd11fed1',
+    requirements: 'Windows 11 on ARM · no admin rights needed',
+    installSteps: [
+      { text: 'Run Kernel-Base-IDE-win-arm64-Setup.exe. It installs per-user to:', code: '%LOCALAPPDATA%\\Programs\\Kernel Base' },
+      { text: 'The preview installer is unsigned. If SmartScreen appears, choose More info, then Run anyway.' },
+      { text: 'Launch Kernel Base from the Start menu.' },
+    ],
+  },
   {
     id: 'mac-arm64',
     os: 'macOS',
@@ -96,17 +131,53 @@ export const downloadUrl = (build: InstallerBuild) => `${DOWNLOAD_BASE_URL}${bui
 
 export const formatSize = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(0)} MB`;
 
-/** Best-guess platform for the visitor, used to pick the primary CTA. */
-export function detectPlatform(): PlatformId {
-  if (typeof navigator === 'undefined') return 'mac-arm64';
+export const OS_FAMILIES: OsFamily[] = ['Windows', 'macOS', 'Linux'];
+
+export interface DetectedPlatform {
+  /** Best-guess installer for this visitor. */
+  id: PlatformId;
+  /** Phone or tablet: the desktop app cannot be installed on this device. */
+  isMobile: boolean;
+}
+
+/** Synchronous best guess, from the user agent. */
+export function detectPlatform(): DetectedPlatform {
+  if (typeof navigator === 'undefined') return { id: 'win-x64', isMobile: false };
   const ua = navigator.userAgent.toLowerCase();
-  const platform = (
-    (navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform ||
-    navigator.platform ||
-    ''
-  ).toLowerCase();
-  if (ua.includes('linux') || platform.includes('linux')) {
-    return ua.includes('aarch64') || ua.includes('arm64') ? 'linux-arm64' : 'linux-x64';
+  const uaData = (navigator as Navigator & { userAgentData?: { platform?: string; mobile?: boolean } }).userAgentData;
+  const platform = (uaData?.platform || navigator.platform || '').toLowerCase();
+  const isIpad = platform === 'macintel' && navigator.maxTouchPoints > 1;
+  const isMobile = Boolean(uaData?.mobile) || /android|iphone|ipad|ipod|mobile/.test(ua) || isIpad;
+
+  if (/iphone|ipad|ipod/.test(ua) || isIpad) return { id: 'mac-arm64', isMobile: true };
+  if (ua.includes('android')) return { id: 'win-x64', isMobile: true };
+  if (ua.includes('windows') || platform.startsWith('win')) {
+    return { id: /arm64|aarch64/.test(ua) ? 'win-arm64' : 'win-x64', isMobile };
   }
-  return 'mac-arm64';
+  if (ua.includes('mac') || platform.includes('mac')) return { id: 'mac-arm64', isMobile };
+  if (ua.includes('linux') || platform.includes('linux') || ua.includes('cros')) {
+    return { id: /aarch64|arm64/.test(ua) ? 'linux-arm64' : 'linux-x64', isMobile };
+  }
+  return { id: 'win-x64', isMobile };
+}
+
+/**
+ * Refines the CPU architecture with User-Agent Client Hints where available
+ * (Chromium on Windows/Linux reports "arm" vs "x86"). Resolves to the sync guess otherwise.
+ */
+export async function refinePlatform(guess: DetectedPlatform): Promise<DetectedPlatform> {
+  if (guess.isMobile || typeof navigator === 'undefined') return guess;
+  const uaData = (navigator as Navigator & {
+    userAgentData?: { getHighEntropyValues?: (hints: string[]) => Promise<{ architecture?: string; bitness?: string }> };
+  }).userAgentData;
+  if (!uaData?.getHighEntropyValues) return guess;
+  try {
+    const { architecture } = await uaData.getHighEntropyValues(['architecture', 'bitness']);
+    const arm = architecture === 'arm';
+    if (guess.id.startsWith('win')) return { ...guess, id: arm ? 'win-arm64' : 'win-x64' };
+    if (guess.id.startsWith('linux')) return { ...guess, id: arm ? 'linux-arm64' : 'linux-x64' };
+  } catch {
+    /* hints unavailable */
+  }
+  return guess;
 }

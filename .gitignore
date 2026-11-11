@@ -10,6 +10,7 @@ coverage/
 # Installer binaries (>100MB, exceed GitHub file limit). Host on GitHub Releases.
 public/downloads/*.dmg
 public/downloads/*.tar.gz
+public/downloads/*.exe
 
 # Archify working folders (receipts, browser evidence)
 .archify/

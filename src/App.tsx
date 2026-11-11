@@ -77,7 +77,7 @@ function AppContent() {
   // Landing page owns its own document title (useDocJsonLd sets the doc page title).
   useEffect(() => {
     if (isLanding) {
-      document.title = 'Kernel Base — AI-Native Multi-Agent IDE for macOS & Linux';
+      document.title = 'Kernel Base — AI-Native Multi-Agent IDE for Windows, macOS & Linux';
     }
   }, [isLanding, currentPage]);
 

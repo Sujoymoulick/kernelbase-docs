@@ -1,3 +1,5 @@
 fb8ddcc123226500b36a41d3da34d2758b3d83acb3898d183b9d0c5529c8c774  Kernel-Base-IDE-arm64.dmg
-d636227b44d8f6fc2c4eb69212b48292281d230ef8685dcea7bb054bee1921f1  Kernel-Base-IDE-linux-x64.tar.gz
 9e2158ff664931517cf2fa1294c75f14ae7c257e225f44356550baadf63c1ec0  Kernel-Base-IDE-linux-arm64.tar.gz
+d636227b44d8f6fc2c4eb69212b48292281d230ef8685dcea7bb054bee1921f1  Kernel-Base-IDE-linux-x64.tar.gz
+deae9ee32e6377cd682cdf14f1b62acbffdfdd4fe89d1bac65e403c7dd11fed1  Kernel-Base-IDE-win-arm64-Setup.exe
+2af5692ff9a2cae010892fb86bfeef89bae9a3844b39cf07f75c38ca58caeae0  Kernel-Base-IDE-win-x64-Setup.exe
