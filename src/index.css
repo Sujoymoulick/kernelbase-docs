@@ -23,6 +23,9 @@ html.dark {
   --kb-code-border:      #5A210F;
   --kb-code-text:        #F8F5F2;
   --kb-selection-bg:     rgba(166,64,17,0.30);
+  --sky-400:             #38bdf8;
+  --sky-500:             #0ea5e9;
+  --primary:             #E86526;
   color-scheme: dark;
 }
 
@@ -47,7 +50,29 @@ html:not(.dark) {
   --kb-code-border:      #5A210F;
   --kb-code-text:        #F8F5F2;
   --kb-selection-bg:     rgba(201,75,26,0.15);
+  --sky-400:             #38bdf8;
+  --sky-500:             #0ea5e9;
+  --primary:             #C94B1A;
   color-scheme: light;
+}
+
+/* ─── Marquee Animations ─────────────────────────────────────────────── */
+@keyframes marquee {
+  0% { transform: translateX(0%); }
+  100% { transform: translateX(-50%); }
+}
+
+@keyframes marquee-reverse {
+  0% { transform: translateX(-50%); }
+  100% { transform: translateX(0%); }
+}
+
+.animate-marquee {
+  animation: marquee var(--duration, 30s) linear infinite;
+}
+
+.animate-marquee-reverse {
+  animation: marquee-reverse var(--duration, 30s) linear infinite;
 }
 
 /* ─── Base styles using CSS vars ────────────────────────────────────────── */
