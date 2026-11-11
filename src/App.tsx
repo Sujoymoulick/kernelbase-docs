@@ -8,6 +8,7 @@ import { getDocPageBySlug, ALL_DOC_PAGES } from './data/pages';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { useDocJsonLd } from './hooks/useDocJsonLd';
 import { ThemeTransitionOverlay } from './components/common/ThemeTransitionOverlay';
+import { LandingPage } from './components/landing/LandingPage';
 
 function AppContent() {
   const [currentSlug, setCurrentSlug] = useState<string>(() => {
@@ -29,8 +30,9 @@ function AppContent() {
     if (path && getDocPageBySlug(path)) {
       return path;
     }
-    return 'get-started/overview';
+    return '';
   });
+  const isLanding = currentSlug === '';
 
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
@@ -45,6 +47,8 @@ function AppContent() {
       const hash = window.location.hash.replace(/^#\/?/, '');
       if (hash && getDocPageBySlug(hash)) {
         setCurrentSlug(hash);
+      } else if (!hash) {
+        setCurrentSlug('');
       }
     };
 
@@ -59,10 +63,23 @@ function AppContent() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const handleGoHome = () => {
+    window.location.hash = '/';
+    setCurrentSlug('');
+    window.scrollTo({ top: 0 });
+  };
+
   const currentPage = getDocPageBySlug(currentSlug) || ALL_DOC_PAGES[0];
 
   // Dynamically generate and inject JSON-LD structured data and head metadata for SEO
-  useDocJsonLd(currentPage);
+  useDocJsonLd(isLanding ? undefined : currentPage);
+
+  // Landing page owns its own document title (useDocJsonLd sets the doc page title).
+  useEffect(() => {
+    if (isLanding) {
+      document.title = 'Kernel Base — AI-Native Multi-Agent IDE for macOS & Linux';
+    }
+  }, [isLanding, currentPage]);
 
   // Global Cmd+K / Ctrl+K keyboard shortcut
   useEffect(() => {
@@ -76,6 +93,19 @@ function AppContent() {
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   }, []);
+
+  if (isLanding) {
+    return (
+      <>
+        <ThemeTransitionOverlay isTransitioning={isTransitioning} targetTheme={targetTheme} isFallback={isFallback} />
+        <LandingPage
+          isDark={isDark}
+          onToggleTheme={toggleTheme}
+          onOpenDocs={(slug) => handleSelectPage(slug || 'get-started/overview')}
+        />
+      </>
+    );
+  }
 
   return (
     <div
@@ -105,6 +135,7 @@ function AppContent() {
         onSelectSection={handleSelectPage}
         isSidebarCollapsed={isSidebarCollapsed}
         onToggleSidebar={() => setIsSidebarCollapsed((prev) => !prev)}
+        onGoHome={handleGoHome}
       />
 
       {/* Main 3-Zone Desktop Container Layout */}

@@ -13,6 +13,7 @@ interface HeaderProps {
   onSelectSection: (sectionId: string) => void;
   isSidebarCollapsed?: boolean;
   onToggleSidebar?: () => void;
+  onGoHome?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -26,6 +27,7 @@ export const Header: React.FC<HeaderProps> = ({
   onSelectSection,
   isSidebarCollapsed = false,
   onToggleSidebar,
+  onGoHome,
 }) => {
   const topNavItems = [
     { id: 'directory', label: 'Directory', targetSlug: 'get-started/overview' },
@@ -78,10 +80,11 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Brand Logo & Wordmark */}
           <a
-            href="#get-started/overview"
+            href="#/"
             onClick={(e) => {
               e.preventDefault();
-              onSelectSection('get-started/overview');
+              if (onGoHome) onGoHome();
+              else onSelectSection('get-started/overview');
             }}
             className="flex items-center space-x-1.5 sm:space-x-2 font-bold text-sm sm:text-base tracking-tight hover:opacity-95 transition-opacity"
             style={{ color: 'var(--kb-text)' }}

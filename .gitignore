@@ -6,3 +6,7 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Installer binaries (>100MB, exceed GitHub file limit). Host on GitHub Releases.
+public/downloads/*.dmg
+public/downloads/*.tar.gz
